@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Подбор кода</title>
+<style>
+  body { font: 16px Arial, sans-serif; margin: 20px; max-width: 760px; }
+  input, select, button { font: inherit; padding: 7px; margin: 3px; }
+  input.digit { width: 38px; text-align: center; }
+  .line { margin: 10px 0; }
+  #variants { overflow-wrap: anywhere; line-height: 1.8; }
+  .hint { color: #555; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>Подбор кода</h1>
+<p>Код состоит из 4 цифр от 1 до 9. Соседние цифры не повторяются.</p>
+
+<h3>Попытка</h3>
+<div class="line">
+  <input class="digit" id="d0" inputmode="numeric" maxlength="1" aria-label="Цифра 1" placeholder="1">
+  <input class="digit" id="d1" inputmode="numeric" maxlength="1" aria-label="Цифра 2" placeholder="2">
+  <input class="digit" id="d2" inputmode="numeric" maxlength="1" aria-label="Цифра 3" placeholder="3">
+  <input class="digit" id="d3" inputmode="numeric" maxlength="1" aria-label="Цифра 4" placeholder="4">
+</div>
+
+<h3>Что известно о каждой цифре</h3>
+<p class="hint">Выбери подсказку для каждой позиции. «Есть, не здесь» означает, что цифра встречается в коде, но не на этой позиции.</p>
+<div class="line">
+  <label>1: <select id="s0"><option value="u">Неизвестно</option><option value="right">На месте</option><option value="else">Есть, не здесь</option><option value="no">Нет в коде</option></select></label>
+  <label>2: <select id="s1"><option value="u">Неизвестно</option><option value="right">На месте</option><option value="else">Есть, не здесь</option><option value="no">Нет в коде</option></select></label>
+  <label>3: <select id="s2"><option value="u">Неизвестно</option><option value="right">На месте</option><option value="else">Есть, не здесь</option><option value="no">Нет в коде</option></select></label>
+  <label>4: <select id="s3"><option value="u">Неизвестно</option><option value="right">На месте</option><option value="else">Есть, не здесь</option><option value="no">Нет в коде</option></select></label>
+</div>
+
+<h3>Сравнения соседних цифр</h3>
+<div class="line">
+  <label>1 и 2: <select id="r0"><option value="u">Неизвестно</option><option value="gt">1 больше 2</option><option value="lt">1 меньше 2</option></select></label>
+  <label>2 и 3: <select id="r1"><option value="u">Неизвестно</option><option value="gt">2 больше 3</option><option value="lt">2 меньше 3</option></select></label>
+  <label>3 и 4: <select id="r2"><option value="u">Неизвестно</option><option value="gt">3 больше 4</option><option value="lt">3 меньше 4</option></select></label>
+</div>
+
+<div class="line">
+  <button id="add">Добавить попытку</button>
+  <button id="clear">Очистить поля</button>
+  <button id="reset">Сбросить всё</button>
+</div>
+
+<h3>Оставшиеся варианты: <span id="count">0</span></h3>
+<p id="message">Пока нет добавленных подсказок.</p>
+<div id="variants"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const digitFields = [0, 1, 2, 3].map(i => $('d' + i));
+const stateFields = [0, 1, 2, 3].map(i => $('s' + i));
+const relationFields = [0, 1, 2].map(i => $('r' + i));
+const clues = [];
+const allCodes = [];
+
+for (let a = 1; a <= 9; a++)
+for (let b = 1; b <= 9; b++)
+for (let c = 1; c <= 9; c++)
+for (let d = 1; d <= 9; d++) {
+  const code = [a, b, c, d];
+  if (a !== b && b !== c && c !== d) allCodes.push(code);
+}
+
+function matches(code, clue) {
+  for (let i = 0; i < 4; i++) {
+    const digit = clue.digits[i];
+    const state = clue.states[i];
+    if (state === 'right' && code[i] !== digit) return false;
+    if (state === 'else' && (!code.includes(digit) || code[i] === digit)) return false;
+    if (state === 'no' && code.includes(digit)) return false;
+  }
+  for (let i = 0; i < 3; i++) {
+    if (clue.relations[i] === 'gt' && code[i] <= code[i + 1]) return false;
+    if (clue.relations[i] === 'lt' && code[i] >= code[i + 1]) return false;
+  }
+  return true;
+}
+
+function render() {
+  const variants = allCodes.filter(code => clues.every(clue => matches(code, clue)));
+  $('count').textContent = variants.length;
+  $('message').textContent = clues.length
+    ? (variants.length ? 'Подсказок добавлено: ' + clues.length : 'Вариантов нет. Проверь, не противоречат ли подсказки друг другу.')
+    : 'Пока нет добавленных подсказок.';
+  $('variants').textContent = variants.map(code => code.join('')).join(', ');
+}
+
+digitFields.forEach((field, i) => {
+  field.addEventListener('input', () => {
+    field.value = field.value.replace(/[^1-9]/g, '').slice(-1);
+    if (field.value && i < 3) digitFields[i + 1].focus();
+  });
+  field.addEventListener('keydown', event => {
+    if (event.key === 'Backspace' && !field.value && i > 0) digitFields[i - 1].focus();
+  });
+});
+
+$('add').addEventListener('click', () => {
+  const digits = digitFields.map(field => field.value === '' ? NaN : Number(field.value));
+  if (digits.some(n => !Number.isInteger(n) || n < 1 || n > 9)) {
+    $('message').textContent = 'Введи все четыре цифры от 1 до 9.';
+    return;
+  }
+  if (digits[0] === digits[1] || digits[1] === digits[2] || digits[2] === digits[3]) {
+    $('message').textContent = 'Соседние цифры не должны совпадать.';
+    return;
+  }
+  const states = stateFields.map(field => field.value);
+  const relations = relationFields.map(field => field.value);
+  if (states.every(value => value === 'u') && relations.every(value => value === 'u')) {
+    $('message').textContent = 'Отметь хотя бы одну известную подсказку.';
+    return;
+  }
+  clues.push({ digits, states, relations });
+  stateFields.forEach(field => field.value = 'u');
+  relationFields.forEach(field => field.value = 'u');
+  render();
+});
+
+$('clear').addEventListener('click', () => {
+  digitFields.forEach(field => field.value = '');
+  stateFields.forEach(field => field.value = 'u');
+  relationFields.forEach(field => field.value = 'u');
+  digitFields[0].focus();
+});
+$('reset').addEventListener('click', () => {
+  clues.length = 0;
+  digitFields.forEach(field => field.value = '');
+  stateFields.forEach(field => field.value = 'u');
+  relationFields.forEach(field => field.value = 'u');
+  render();
+});
+render();
+</script>
+</body>
+</html>
